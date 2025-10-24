@@ -300,12 +300,33 @@ export async function dockerComposePtyCLI(params: DockerCLIParameters | PartialP
 	});
 }
 
-export function dockerExecFunction(params: DockerCLIParameters | PartialExecParameters | DockerResolverParameters, containerName: string, user: string | undefined, allocatePtyIfPossible = false): ExecFunction {
+export function dockerExecFunction(params: DockerCLIParameters | PartialExecParameters | DockerResolverParameters, containerName: string, user: string | undefined, allocatePtyIfPossible = false, printCommand?: boolean): ExecFunction {
 	return async function (execParams: ExecParameters): Promise<Exec> {
 		const { exec, cmd, args, env } = toExecParameters(params);
 		// Spawning without node-pty: `docker exec` only accepts -t if stdin is a TTY. (https://github.com/devcontainers/cli/issues/606)
 		const canAllocatePty = allocatePtyIfPossible && process.stdin.isTTY && execParams.stdio?.[0] === 'inherit';
 		const { argsPrefix, args: execArgs } = toDockerExecArgs(containerName, user, execParams, canAllocatePty);
+
+		if (printCommand) {
+			// Print the command instead of executing it
+			const fullCommand = [cmd, ...(args || []), ...execArgs].join(' ');
+			console.log(fullCommand);
+			// Return a mock successful execution
+			const { Readable, Writable } = await import('stream');
+			const stdout = new Readable({ read() {} });
+			stdout.push(null); // End the stream
+			const stderr = new Readable({ read() {} });
+			stderr.push(null); // End the stream
+			const stdin = new Writable({ write() {} });
+			return {
+				stdout,
+				stderr,
+				stdin,
+				exit: Promise.resolve({ code: 0, signal: null }),
+				terminate: async () => {},
+			};
+		}
+
 		return exec({
 			cmd,
 			args: (args || []).concat(execArgs),
@@ -316,16 +337,36 @@ export function dockerExecFunction(params: DockerCLIParameters | PartialExecPara
 	};
 }
 
-export async function dockerPtyExecFunction(params: PartialPtyExecParameters | DockerResolverParameters, containerName: string, user: string | undefined, loadNativeModule: <T>(moduleName: string) => Promise<T | undefined>, allowInheritTTY: boolean): Promise<PtyExecFunction> {
+export async function dockerPtyExecFunction(params: PartialPtyExecParameters | DockerResolverParameters, containerName: string, user: string | undefined, loadNativeModule: <T>(moduleName: string) => Promise<T | undefined>, allowInheritTTY: boolean, printCommand?: boolean): Promise<PtyExecFunction> {
 	const pty = await loadNativeModule<typeof ptyType>('node-pty');
 	if (!pty) {
-		const plain = dockerExecFunction(params, containerName, user, true);
+		const plain = dockerExecFunction(params, containerName, user, true, printCommand);
 		return plainExecAsPtyExec(plain, allowInheritTTY);
 	}
 
 	return async function (execParams: PtyExecParameters): Promise<PtyExec> {
 		const { ptyExec, cmd, args, env } = toPtyExecParameters(params);
 		const { argsPrefix, args: execArgs } = toDockerExecArgs(containerName, user, execParams, true);
+
+		if (printCommand) {
+			// Print the command instead of executing it
+			const fullCommand = [cmd, ...(args || []), ...execArgs].join(' ');
+			console.log(fullCommand);
+			// Return a mock successful PTY execution
+			const { EventEmitter } = await import('events');
+			const emitter = new EventEmitter();
+			return {
+				onData: (handler: (data: string) => void) => {
+					emitter.on('data', handler);
+					return { dispose: () => emitter.off('data', handler) };
+				},
+				write: undefined,
+				resize: () => {},
+				exit: Promise.resolve({ code: 0, signal: undefined }),
+				terminate: async () => {},
+			};
+		}
+
 		return ptyExec({
 			cmd,
 			args: (args || []).concat(execArgs),

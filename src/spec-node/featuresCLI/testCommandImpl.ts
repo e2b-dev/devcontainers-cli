@@ -611,6 +611,7 @@ async function exec(cmd: string, args: string[], workspaceFolder: string, inject
 		'remote-env': injectedEnvArray as any,
 		'workspace-folder': workspaceFolder,
 		'skip-feature-auto-mapping': false,
+		'print-command': false,
 		cmd,
 		args,
 		_: [

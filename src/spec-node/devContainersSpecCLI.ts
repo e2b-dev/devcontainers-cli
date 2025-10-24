@@ -1222,6 +1222,7 @@ function execOptions(y: Argv) {
 		'default-user-env-probe': { choices: ['none' as 'none', 'loginInteractiveShell' as 'loginInteractiveShell', 'interactiveShell' as 'interactiveShell', 'loginShell' as 'loginShell'], default: defaultDefaultUserEnvProbe, description: 'Default value for the devcontainer.json\'s "userEnvProbe".' },
 		'remote-env': { type: 'string', description: 'Remote environment variables of the format name=value. These will be added when executing the user commands.' },
 		'skip-feature-auto-mapping': { type: 'boolean', default: false, hidden: true, description: 'Temporary option for testing.' },
+		'print-command': { type: 'boolean', default: false, description: 'Print the Docker command that would be executed instead of running it.' },
 	})
 		.positional('cmd', {
 			type: 'string',
@@ -1283,6 +1284,7 @@ export async function doExec({
 	'default-user-env-probe': defaultUserEnvProbe,
 	'remote-env': addRemoteEnv,
 	'skip-feature-auto-mapping': skipFeatureAutoMapping,
+	'print-command': printCommand,
 	_: restArgs,
 }: ExecArgs & { _?: string[] }) {
 	const disposables: (() => Promise<unknown> | undefined)[] = [];
@@ -1361,7 +1363,7 @@ export async function doExec({
 		}
 		const imageMetadata = getImageMetadataFromContainer(container, config, undefined, idLabels, output).config;
 		const mergedConfig = mergeConfiguration(config.config, imageMetadata);
-		const containerProperties = await createContainerProperties(params, container.Id, configs?.workspaceConfig.workspaceFolder, mergedConfig.remoteUser);
+		const containerProperties = await createContainerProperties(params, container.Id, configs?.workspaceConfig.workspaceFolder, mergedConfig.remoteUser, undefined, printCommand);
 		const updatedConfig = containerSubstitute(cliHost.platform, config.config.configFilePath, containerProperties.env, mergedConfig);
 		const remoteEnv = probeRemoteEnv(common, containerProperties, updatedConfig);
 		const remoteCwd = containerProperties.remoteWorkspaceFolder || containerProperties.homeFolder;

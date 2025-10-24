@@ -396,7 +396,7 @@ export function getDockerContextPath(cliHost: { platform: NodeJS.Platform }, con
 	return parentURI(getDockerfilePath(cliHost, config));
 }
 
-export async function createContainerProperties(params: DockerResolverParameters, containerId: string, remoteWorkspaceFolder: string | undefined, remoteUser: string | undefined, rootShellServer?: ShellServer) {
+export async function createContainerProperties(params: DockerResolverParameters, containerId: string, remoteWorkspaceFolder: string | undefined, remoteUser: string | undefined, rootShellServer?: ShellServer, printCommand?: boolean) {
 	const { common } = params;
 	const inspecting = 'Inspecting container';
 	const start = common.output.start(inspecting);
@@ -405,9 +405,9 @@ export async function createContainerProperties(params: DockerResolverParameters
 	const containerUser = remoteUser || containerInfo.Config.User || 'root';
 	const [, user, , group] = /([^:]*)(:(.*))?/.exec(containerUser) as (string | undefined)[];
 	const containerEnv = envListToObj(containerInfo.Config.Env);
-	const remoteExec = dockerExecFunction(params, containerId, containerUser);
-	const remotePtyExec = await dockerPtyExecFunction(params, containerId, containerUser, common.loadNativeModule, common.allowInheritTTY);
-	const remoteExecAsRoot = dockerExecFunction(params, containerId, 'root');
+	const remoteExec = dockerExecFunction(params, containerId, containerUser, false, printCommand);
+	const remotePtyExec = await dockerPtyExecFunction(params, containerId, containerUser, common.loadNativeModule, common.allowInheritTTY, printCommand);
+	const remoteExecAsRoot = dockerExecFunction(params, containerId, 'root', false, printCommand);
 	return getContainerProperties({
 		params: common,
 		createdAt: containerInfo.Created,
